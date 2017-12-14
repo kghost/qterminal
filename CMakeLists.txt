@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.0.2 FATAL_ERROR)
 project(qterminal)
 
 include(GNUInstallDirs)
+include(CheckFunctionExists)
 
 # qterminal version
 set(STR_VERSION "0.8.0")
@@ -18,6 +19,7 @@ endif()
 # we need qpa/qplatformnativeinterface.h for global shortcut
 find_package(Qt5Gui REQUIRED)
 find_package(Qt5Widgets REQUIRED)
+find_package(Qt5Network REQUIRED)
 find_package(Qt5LinguistTools REQUIRED)
 if(APPLE)
 elseif(UNIX)
@@ -34,6 +36,7 @@ message(STATUS "Qt version: ${Qt5Core_VERSION}")
 message(STATUS "Using bundled Qxt...")
 set(QXT_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party")
 
+CHECK_FUNCTION_EXISTS(setenv HAVE_F_SETENV)
 
 if(APPLE)
    find_library(CARBON_LIBRARY Carbon REQUIRED)
@@ -178,13 +181,25 @@ add_executable(${EXE_NAME} ${GUI_TYPE}
     ${APPLE_BUNDLE_SOURCES}
     ${QTERM_QM}
 )
+
+if(HAVE_F_SETENV)
+    target_compile_definitions(${EXE_NAME}
+        PRIVATE
+            "HAVE_F_SETENV"
+    )
+endif()
+
 target_link_libraries(${EXE_NAME}
     Qt5::Gui
     qtermwidget5
-    util
 )
 if(QXT_FOUND)
     target_link_libraries(${EXE_NAME} ${QXT_CORE_LIB} ${QXT_GUI_LIB})
+else()
+    target_compile_definitions(${EXE_NAME}
+        PRIVATE
+            "BUILD_QXT_GUI"
+    )
 endif()
 
 if (Qt5DBus_FOUND)

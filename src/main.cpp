@@ -21,7 +21,11 @@
 
 #include <assert.h>
 #include <stdio.h>
+#ifdef HAVE_GETOPT_H
 #include <getopt.h>
+#else
+#include "getopt/getopt.h"
+#endif // HAVE_GETOPT_H
 #include <stdlib.h>
 #ifdef HAVE_QDBUS
     #include <QtDBus/QtDBus>
@@ -111,8 +115,9 @@ void parse_args(int argc, char* argv[], QString& workdir, QString & shell_comman
 
 int main(int argc, char *argv[])
 {
-    setenv("TERM", "xterm", 1); // TODO/FIXME: why?
-
+#ifdef HAVE_F_SETENV
+	setenv("TERM", "xterm", 1); // TODO/FIXME: why?
+#endif // HAVE_F_SETENV
     QApplication::setApplicationName("qterminal");
     QApplication::setApplicationVersion(STR_VERSION);
     QApplication::setOrganizationDomain("qterminal.org");
