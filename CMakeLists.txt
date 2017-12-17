@@ -173,6 +173,10 @@ else()
     add_definitions(-DTRANSLATIONS_DIR=\"${TRANSLATIONS_DIR}\")
 endif()
 
+if(MSVC)
+set(GUI_TYPE WIN32)
+endif()
+
 add_executable(${EXE_NAME} ${GUI_TYPE}
     ${QTERM_SRC}
     ${QTERM_UI}
@@ -181,6 +185,17 @@ add_executable(${EXE_NAME} ${GUI_TYPE}
     ${APPLE_BUNDLE_SOURCES}
     ${QTERM_QM}
 )
+
+set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD 17)
+# force Unicode over Multi-byte
+if(MSVC)
+set_property(TARGET ${EXE_NAME} PROPERTY LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
+target_compile_definitions(${EXE_NAME}
+    PRIVATE
+        "-D_UNICODE"
+        "-DUNICODE"
+)
+endif()
 
 if(HAVE_F_SETENV)
     target_compile_definitions(${EXE_NAME}

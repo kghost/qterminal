@@ -38,6 +38,10 @@
 #include "qterminalapp.h"
 #include "dbusaddressable.h"
 
+namespace Konsole {
+	__declspec(dllimport) short TargetPtyTcpPort;
+}
+
 typedef std::function<bool(MainWindow&)> checkfn;
 Q_DECLARE_METATYPE(checkfn)
 
@@ -62,10 +66,17 @@ MainWindow::MainWindow(TerminalConfig &cfg,
       m_dropLockButton(0),
       m_dropMode(dropMode)
 {
+	bridge = new QProcess();
+	connect(bridge, SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(bridgeErrorOccurred(QProcess::ProcessError)));  // connect process signals with your code
+	connect(bridge, SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(bridgeFinished(int, QProcess::ExitStatus)));  // connect process signals with your code
+	connect(bridge, SIGNAL(readyReadStandardOutput()), this, SLOT(bridgeOutput()));  // connect process signals with your code
+	bridge->start("WSL.exe", {"./tcppty"});
+
 #ifdef HAVE_QDBUS
     registerAdapter<WindowAdaptor, MainWindow>(this);
 #endif
-    QTerminalApp::Instance()->addWindow(this);
+
+	QTerminalApp::Instance()->addWindow(this);
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_DeleteOnClose);
 
@@ -117,7 +128,35 @@ MainWindow::MainWindow(TerminalConfig &cfg,
 
     connect(consoleTabulator, &TabWidget::currentTitleChanged, this, &MainWindow::onCurrentTitleChanged);
     connect(menu_Actions, SIGNAL(aboutToShow()), this, SLOT(updateDisabledActions()));
+}
 
+void MainWindow::bridgeErrorOccurred(QProcess::ProcessError error) {
+	QMessageBox msgBox;
+	QString msg;
+	msg.sprintf("Bridge failed (%d), Check your WSL installation.\n\n", error);
+	msgBox.setIcon(QMessageBox::Critical);
+	msgBox.setText(msg + bridge->readAllStandardError());
+	msgBox.exec();
+}
+
+void MainWindow::bridgeFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+	QMessageBox msgBox;
+	QString msg;
+	msg.sprintf("Bridge exited (%d/%d), Check your WSL installation.\n\n", exitCode, exitStatus);
+	msgBox.setIcon(QMessageBox::Critical);
+	msgBox.setText(msg + bridge->readAllStandardError());
+	msgBox.exec();
+}
+
+void MainWindow::bridgeOutput() {
+	auto port = bridge->readLine().trimmed().toInt();
+	if (port > 0) {
+		Konsole::TargetPtyTcpPort = port;
+		initialize();
+	}
+}
+
+void MainWindow::initialize() {
     /* The tab should be added after all changes are made to
        the main window; otherwise, the initial prompt might
        get jumbled because of changes in internal geometry. */
@@ -140,6 +179,9 @@ void MainWindow::rebuildActions()
 MainWindow::~MainWindow()
 {
     QTerminalApp::Instance()->removeWindow(this);
+	bridge->disconnect();
+	bridge->close();
+	delete bridge;
 }
 
 void MainWindow::enableDropMode()
