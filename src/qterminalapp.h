@@ -9,13 +9,13 @@
 
 #include "mainwindow.h"
 
-
+class QProcess;
 class QTerminalApp : public QApplication
 {
 Q_OBJECT
 
 public:
-    MainWindow *newWindow(bool dropMode, TerminalConfig &cfg);
+    MainWindow *newWindow(TerminalConfig &cfg);
     QList<MainWindow*> getWindowList();
     void addWindow(MainWindow *window);
     void removeWindow(MainWindow *window);
@@ -29,18 +29,22 @@ public:
     QList<QDBusObjectPath> getWindows();
     QDBusObjectPath newWindow(const QHash<QString,QVariant> &termArgs);
     QDBusObjectPath getActiveWindow();
-    bool isDropMode();
-    bool toggleDropdown();
     #endif
 
     static void cleanup();
 
 private:
+	QProcess *bridge;
     QString m_workDir;
     QList<MainWindow *> m_windowList;
     static QTerminalApp *m_instance;
     QTerminalApp(int &argc, char **argv);
-    ~QTerminalApp(){};
+    ~QTerminalApp();
+
+private slots:
+    void bridgeErrorOccurred(QProcess::ProcessError error);
+    void bridgeFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void bridgeOutput();
 };
 
 template <class T> T* findParent(QObject *child)

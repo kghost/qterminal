@@ -30,7 +30,7 @@
 
 
 class QToolButton;
-class QProcess;
+
 class MainWindow : public QMainWindow, private Ui::mainWindow, public DBusAddressable
 {
     Q_OBJECT
@@ -57,7 +57,6 @@ protected:
 private:
     QActionGroup *tabPosition, *scrollBarPosition, *keyboardCursorShape;
     QMenu *tabPosMenu, *scrollPosMenu, *keyboardCursorShapeMenu;
-	QProcess *bridge;
 
     // A parent object for QObjects that are created dynamically based on settings
     // Used to simplify the setting cleanup on reconfiguration: deleting settingOwner frees all related QObjects
@@ -73,7 +72,6 @@ private:
                       const char *slot, QMenu *menu = NULL, const QVariant &data = QVariant());
     QMap< QString, QAction * > actions;
     
-	void initialize();
     void rebuildActions();
 
     void setup_FileMenu_Actions();
@@ -99,9 +97,6 @@ public slots:
     void updateDisabledActions();
 
 private slots:
-    void bridgeErrorOccurred(QProcess::ProcessError error);
-	void bridgeFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void bridgeOutput();
     void on_consoleTabulator_currentChanged(int);
     void propertiesChanged();
     void actAbout_triggered();

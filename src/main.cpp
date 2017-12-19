@@ -18,6 +18,7 @@
 
 #include <QApplication>
 #include <QtGlobal>
+#include <QMessageBox>
 
 #include <assert.h>
 #include <stdio.h>
@@ -45,9 +46,6 @@ const char* const short_options = "vhw:e:dp:";
 const struct option long_options[] = {
     {"version", 0, NULL, 'v'},
     {"help",    0, NULL, 'h'},
-    {"workdir", 1, NULL, 'w'},
-    {"execute", 1, NULL, 'e'},
-    {"drop",    0, NULL, 'd'},
     {"profile", 1, NULL, 'p'},
     {NULL,      0, NULL,  0}
 };
@@ -58,12 +56,9 @@ void print_usage_and_exit(int code)
 {
     printf("QTerminal %s\n", STR_VERSION);
     puts("Usage: qterminal [OPTION]...\n");
-    puts("  -d,  --drop               Start in \"dropdown mode\" (like Yakuake or Tilda)");
-    puts("  -e,  --execute <command>  Execute command instead of shell");
     puts("  -h,  --help               Print this help");
     puts("  -p,  --profile            Load qterminal with specific options");
     puts("  -v,  --version            Prints application version and exits");
-    puts("  -w,  --workdir <dir>      Start session with specified work directory");
     puts("\nHomepage: <https://github.com/lxde/qterminal>");
     puts("Report bugs to <https://github.com/lxde/qterminal/issues>");
     exit(code);
@@ -75,32 +70,15 @@ void print_version_and_exit(int code=0)
     exit(code);
 }
 
-void parse_args(int argc, char* argv[], QString& workdir, QString & shell_command, out bool& dropMode)
+void parse_args(int argc, char* argv[])
 {
     int next_option;
-    dropMode = false;
     do{
         next_option = getopt_long(argc, argv, short_options, long_options, NULL);
         switch(next_option)
         {
             case 'h':
                 print_usage_and_exit(0);
-            case 'w':
-                workdir = QString(optarg);
-                break;
-            case 'e':
-                shell_command = QString(optarg);
-                // #15 "Raw" -e params
-                // Passing "raw" params (like konsole -e mcedit /tmp/tmp.txt") is more preferable - then I can call QString("qterminal -e ") + cmd_line in other programs
-                while (optind < argc)
-                {
-                    //printf("arg: %d - %s\n", optind, argv[optind]);
-                    shell_command += ' ' + QString(argv[optind++]);
-                }
-                break;
-            case 'd':
-                dropMode = true;
-                break;
             case 'p':
                 Properties::Instance(QString(optarg));
                 break;
@@ -132,13 +110,7 @@ int main(int argc, char *argv[])
         app->registerOnDbus();
     #endif
 
-    QString workdir, shell_command;
-    bool dropMode;
-    parse_args(argc, argv, workdir, shell_command, dropMode);
-
-    if (workdir.isEmpty())
-        workdir = QDir::currentPath();
-    app->setWorkingDirectory(workdir);
+    parse_args(argc, argv);
 
     const QSettings settings;
     const QFileInfo customStyle = QFileInfo(
@@ -172,9 +144,6 @@ int main(int argc, char *argv[])
 #endif
     app->installTranslator(&translator);
 
-    TerminalConfig initConfig = TerminalConfig(workdir, shell_command);
-    app->newWindow(dropMode, initConfig);
-
     int ret = app->exec();
     delete Properties::Instance();
     app->cleanup();
@@ -182,21 +151,10 @@ int main(int argc, char *argv[])
     return ret;
 }
 
-MainWindow *QTerminalApp::newWindow(bool dropMode, TerminalConfig &cfg)
+MainWindow *QTerminalApp::newWindow(TerminalConfig &cfg)
 {
-    MainWindow *window = NULL;
-    if (dropMode)
-    {
-        QWidget *hiddenPreviewParent = new QWidget(0, Qt::Tool);
-        window = new MainWindow(cfg, dropMode, hiddenPreviewParent);
-        if (Properties::Instance()->dropShowOnStart)
-            window->show();
-    }
-    else
-    {
-        window = new MainWindow(cfg, dropMode);
-        window->show();
-    }
+    MainWindow *window = new MainWindow(cfg, false);
+    window->show();
     return window;
 }
 
@@ -213,9 +171,50 @@ QTerminalApp *QTerminalApp::Instance(int &argc, char **argv)
     return m_instance;
 }
 
+namespace Konsole {
+    __declspec(dllimport) short TargetPtyTcpPort;
+}
+
 QTerminalApp::QTerminalApp(int &argc, char **argv)
     :QApplication(argc, argv)
 {
+    bridge = new QProcess();
+    connect(bridge, SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(bridgeErrorOccurred(QProcess::ProcessError)));  // connect process signals with your code
+    connect(bridge, SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(bridgeFinished(int, QProcess::ExitStatus)));  // connect process signals with your code
+    connect(bridge, SIGNAL(readyReadStandardOutput()), this, SLOT(bridgeOutput()));  // connect process signals with your code
+    bridge->start("WSL.exe", {"./tcppty"});
+}
+
+QTerminalApp::~QTerminalApp() {
+    bridge->disconnect();
+    bridge->close();
+    delete bridge;
+}
+
+void QTerminalApp::bridgeErrorOccurred(QProcess::ProcessError error) {
+	QMessageBox msgBox;
+	QString msg;
+	msg.sprintf("Bridge failed (%d), Check your WSL installation.\n\n", error);
+	msgBox.setIcon(QMessageBox::Critical);
+	msgBox.setText(msg + bridge->readAllStandardError());
+	msgBox.exec();
+}
+
+void QTerminalApp::bridgeFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+	QMessageBox msgBox;
+	QString msg;
+	msg.sprintf("Bridge exited (%d/%d), Check your WSL installation.\n\n", exitCode, exitStatus);
+	msgBox.setIcon(QMessageBox::Critical);
+	msgBox.setText(msg + bridge->readAllStandardError());
+	msgBox.exec();
+}
+
+void QTerminalApp::bridgeOutput() {
+	auto port = bridge->readLine().trimmed().toInt();
+	if (port > 0) {
+		Konsole::TargetPtyTcpPort = port;
+        newWindow(TerminalConfig());
+    }
 }
 
 QString &QTerminalApp::getWorkingDirectory()
@@ -295,26 +294,4 @@ QDBusObjectPath QTerminalApp::getActiveWindow()
     return qobject_cast<MainWindow*>(aw)->getDbusPath();
 }
 
-bool QTerminalApp::isDropMode() {
-  if (m_windowList.count() == 0) {
-    return false;
-  }
-  MainWindow *wnd = m_windowList.at(0);
-  return wnd->dropMode();
-}
-
-bool QTerminalApp::toggleDropdown() {
-  if (m_windowList.count() == 0) {
-    return false;
-  }
-  MainWindow *wnd = m_windowList.at(0);
-  if (!wnd->dropMode()) {
-    return false;
-  }
-  wnd->showHide();
-  return true;
-}
-
-
 #endif
-
