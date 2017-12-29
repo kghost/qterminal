@@ -103,6 +103,12 @@ if(NOT QXT_FOUND)
     endif()
 endif()
 
+if(WIN32)
+set(QTERM_RC src/qterminal.rc)
+else()
+set(QTERM_RC "")
+endif()
+
 set(QTERM_UI_SRC
     src/forms/qterminal.ui
     src/forms/propertiesdialog.ui
@@ -182,6 +188,7 @@ add_executable(${EXE_NAME} ${GUI_TYPE}
     ${QTERM_UI}
     ${QTERM_MOC}
     ${QTERM_RCC}
+    ${QTERM_RC}
     ${APPLE_BUNDLE_SOURCES}
     ${QTERM_QM}
 )
