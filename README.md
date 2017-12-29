@@ -8,6 +8,10 @@ This project is licensed under the terms of the [GPLv2](https://www.gnu.org/lice
 
 [Screen shots](https://imgur.com/a/VMXp1)
 
+## Download
+
+See [Releases](https://github.com/kghost/qterminal/releases)
+
 ## Features
 
  * Multiple window
@@ -28,9 +32,7 @@ XTerm features comapre to CMD or any CMD based terminal:
 
  * Multiple WSL instance support
 
-## Installation
-
-### Compiling sources
+## Build
 
 Dependencies:
 
@@ -39,10 +41,6 @@ Dependencies:
  * [QTermWidget for WSL](https://github.com/kghost/qtermwidget)
  * [utf8proc](https://github.com/kghost/utf8proc)
  * [tcppty](https://github.com/kghost/tcppty), a wsl backend act as a bridge.
-
-### Binary packages
-
-See [Releases](https://github.com/kghost/qterminal/releases)
 
 ## FAQ
 
@@ -57,6 +55,10 @@ User setting is stored under per user roaming directory, eg: C:\\Users\\${userna
 ### My Home/End key doesn't work.
 
 Ensure that default kaytab is used (File -> Preferences -> Behavior -> Emulation), or try other key maps, even modify kaytab define files, located \share\qtermwidget5\kb-layouts\ inside program directory.
+
+### Can I run CMD inside QTerminal ?
+
+No, you can't. You can try run CMD.exe under WSL, it kinda works. But I won't put any work on it.
 
 ## Bug Report
 
