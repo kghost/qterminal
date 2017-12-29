@@ -8,6 +8,26 @@ This project is licensed under the terms of the [GPLv2](https://www.gnu.org/lice
 
 [Screen shots](https://imgur.com/a/VMXp1)
 
+## Features
+
+ * Multiple window
+ * Multiple tab
+ * Multiple panel (verticl/horizontal split)
+
+XTerm features comapre to CMD or any CMD based terminal:
+
+ * Bracketed paste: let the application know you are pasting not typing to prevent it doing something stupid.
+
+![Paste](https://raw.githubusercontent.com/kghost/qterminal/assets/paste.gif)
+
+ * Cursor styles: the application can change cursor styles (BLOCK/BAR/UNDERLINE)
+
+![Cursor](https://raw.githubusercontent.com/kghost/qterminal/assets/cursor.gif)
+
+### TODO
+
+ * Multiple WSL instance support
+
 ## Installation
 
 ### Compiling sources
