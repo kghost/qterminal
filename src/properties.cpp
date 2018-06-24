@@ -41,6 +41,7 @@ Properties::Properties(const QString& filename)
         m_settings = new QSettings();
     else
         m_settings = new QSettings(filename);
+    loadSettings();
     qDebug("Properties constructor called");
 }
 
