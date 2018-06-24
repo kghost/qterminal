@@ -59,8 +59,8 @@ void print_usage_and_exit(int code)
     puts("  -h,  --help               Print this help");
     puts("  -p,  --profile            Load qterminal with specific options");
     puts("  -v,  --version            Prints application version and exits");
-    puts("\nHomepage: <https://github.com/lxde/qterminal>");
-    puts("Report bugs to <https://github.com/lxde/qterminal/issues>");
+    puts("\nHomepage: <https://github.com/lxqt/qterminal>");
+    puts("Report bugs to <https://github.com/lxqt/qterminal/issues>");
     exit(code);
 }
 
@@ -271,7 +271,7 @@ void QTerminalApp::registerOnDbus()
 QList<QDBusObjectPath> QTerminalApp::getWindows()
 {
     QList<QDBusObjectPath> windows;
-    foreach (MainWindow *wnd, m_windowList)
+    for (MainWindow *wnd : qAsConst(m_windowList))
     {
         windows.push_back(wnd->getDbusPath());
     }

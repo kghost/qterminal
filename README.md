@@ -54,9 +54,16 @@ User setting is stored under per user roaming directory, eg: C:\\Users\\${userna
 
 ### My Home/End key doesn't work.
 
+<<<<<<< HEAD
 Ensure that default kaytab is used (File -> Preferences -> Behavior -> Emulation), or try other key maps, even modify kaytab define files, located \share\qtermwidget5\kb-layouts\ inside program directory.
 
 ### Can I run CMD inside QTerminal ?
+=======
+Dependencies are qtx11extras ≥ 5.2 and [QTermWidget](https://github.com/lxqt/qtermwidget).
+In order to build CMake ≥ 3.0.2 and [lxqt-build-tools](https://github.com/lxqt/lxqt-build-tools) are needed as well as optionally Git to pull latest VCS checkouts. The localization files were outsourced to repository [lxqt-l10n](https://github.com/lxqt/lxqt-l10n) so the corresponding dependencies are needed, too. Please refer to this repository's `README.md` for further information.
+
+Code configuration is handled by CMake. Building out of source is required. CMake variable `CMAKE_INSTALL_PREFIX` will normally have to be set to `/usr`.
+>>>>>>> 0.9.0
 
 No, you can't. You can try run CMD.exe under WSL, it kinda works. But I won't put any work on it.
 

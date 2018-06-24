@@ -69,6 +69,7 @@ void Properties::loadSettings()
     colorScheme = m_settings->value("colorScheme", "Linux").toString();
 
     highlightCurrentTerminal = m_settings->value("highlightCurrentTerminal", true).toBool();
+    showTerminalSizeHint = m_settings->value("showTerminalSizeHint", true).toBool();
 
     font = QFont(qvariant_cast<QString>(m_settings->value("fontFamily", defaultFont().family())),
                  qvariant_cast<int>(m_settings->value("fontSize", defaultFont().pointSize())));
@@ -112,6 +113,7 @@ void Properties::loadSettings()
     /* tab width limit */
     limitTabWidth = m_settings->value("LimitTabWidth", true).toBool();
     limitTabWidthValue = m_settings->value("LimitTabWidthValue", 500).toInt();
+    showCloseTabButton = m_settings->value("ShowCloseTabButton", true).toBool();
 
     /* toggles */
     borderless = m_settings->value("Borderless", false).toBool();
@@ -121,6 +123,7 @@ void Properties::loadSettings()
     saveSizeOnExit = m_settings->value("SaveSizeOnExit", true).toBool();
     savePosOnExit = m_settings->value("SavePosOnExit", true).toBool();
     useCWD = m_settings->value("UseCWD", false).toBool();
+    term = m_settings->value("Term", "xterm-256color").toString();
 
     // bookmarks
     useBookmarks = m_settings->value("UseBookmarks", false).toBool();
@@ -151,6 +154,7 @@ void Properties::saveSettings()
     m_settings->setValue("guiStyle", guiStyle);
     m_settings->setValue("colorScheme", colorScheme);
     m_settings->setValue("highlightCurrentTerminal", highlightCurrentTerminal);
+    m_settings->setValue("showTerminalSizeHint", showTerminalSizeHint);
     m_settings->setValue("fontFamily", font.family());
     m_settings->setValue("fontSize", font.pointSize());
     //Clobber legacy setting
@@ -165,7 +169,8 @@ void Properties::saveSettings()
     {
         it.next();
         QStringList sequenceStrings;
-        foreach (const QKeySequence &shortcut, it.value()->shortcuts())
+        const auto shortcuts = it.value()->shortcuts();
+        for (const QKeySequence &shortcut : shortcuts)
             sequenceStrings.append(shortcut.toString());
         m_settings->setValue(it.key(), sequenceStrings.join('|'));
     }
@@ -205,6 +210,7 @@ void Properties::saveSettings()
 
     m_settings->setValue("LimitTabWidth", limitTabWidth);
     m_settings->setValue("LimitTabWidthValue", limitTabWidthValue);
+    m_settings->setValue("ShowCloseTabButton", showCloseTabButton);
 
     m_settings->setValue("Borderless", borderless);
     m_settings->setValue("TabBarless", tabBarless);
@@ -213,6 +219,7 @@ void Properties::saveSettings()
     m_settings->setValue("SavePosOnExit", savePosOnExit);
     m_settings->setValue("SaveSizeOnExit", saveSizeOnExit);
     m_settings->setValue("UseCWD", useCWD);
+    m_settings->setValue("Term", term);
 
     // bookmarks
     m_settings->setValue("UseBookmarks", useBookmarks);

@@ -17,14 +17,19 @@
  ***************************************************************************/
 
 #include "tabbar.h"
-#include "tabstyle.h"
 
 TabBar::TabBar(QWidget *parent)
     : QTabBar(parent),
       mLimitWidth(false),
       mLimitWidthValue(0)
 {
-    setStyle(new TabStyle(this));
+    // To make the selected tab text bold, first give a bold font to the tabbar
+    // for QStyle::sizeFromContents(QStyle::CT_TabBarTab, ...) to make room
+    // for the bold text, and then, set the non-selected tab text to normal.
+    QFont f = font();
+    f.setBold(true);
+    setFont(f);
+    setStyleSheet("QTabBar::tab:!selected { font-weight: normal; }");
 }
 
 void TabBar::setLimitWidth(bool limitWidth)
@@ -41,6 +46,7 @@ void TabBar::updateWidth()
 {
     // This seems to be the only way to trigger an update
     setIconSize(iconSize());
+    setElideMode(Qt::ElideMiddle);
 }
 
 QSize TabBar::tabSizeHint(int index) const
@@ -49,7 +55,13 @@ QSize TabBar::tabSizeHint(int index) const
 
     // If the width is limited, use that for the width hint
     if (mLimitWidth) {
-        size.setWidth(mLimitWidthValue);
+        if (shape() == QTabBar::RoundedEast || shape() == QTabBar::TriangularEast
+            || shape() == QTabBar::RoundedWest || shape() == QTabBar::TriangularWest) {
+            size.setHeight(mLimitWidthValue);
+        }
+        else {
+            size.setWidth(mLimitWidthValue);
+        }
     }
 
     return size;

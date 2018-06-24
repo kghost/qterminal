@@ -18,6 +18,7 @@
 
 #include <QTabBar>
 #include <QInputDialog>
+#include <QColorDialog>
 #include <QMouseEvent>
 #include <QMenu>
 
@@ -49,15 +50,15 @@ TabWidget::TabWidget(QWidget* parent) : QTabWidget(parent), tabNumerator(0), mTa
 
     tabBar()->setUsesScrollButtons(true);
 
-    setTabsClosable(true);
     setMovable(true);
     setUsesScrollButtons(true);
 
     tabBar()->installEventFilter(this);
 
-    connect(this, SIGNAL(tabCloseRequested(int)), this, SLOT(removeTab(int)));
-    connect(tabBar(), SIGNAL(tabMoved(int,int)), this, SLOT(updateTabIndices()));
-    connect(this, SIGNAL(tabRenameRequested(int)), this, SLOT(renameSession(int)));
+    connect(this, &TabWidget::tabCloseRequested, this, &TabWidget::removeTab);
+    connect(tabBar(), &QTabBar::tabMoved, this, &TabWidget::updateTabIndices);
+    connect(this, &TabWidget::tabRenameRequested, this, &TabWidget::renameSession);
+    connect(this, &TabWidget::tabTitleColorChangeRequested, this, &TabWidget::setTitleColor);
 }
 
 TermWidgetHolder * TabWidget::terminalHolder()
@@ -77,8 +78,8 @@ int TabWidget::addNewTab(TerminalConfig config)
 
     TermWidgetHolder *console = new TermWidgetHolder(config, this);
     console->setWindowTitle(label);
-    connect(console, SIGNAL(finished()), SLOT(removeFinished()));
-    connect(console, SIGNAL(lastTerminalClosed()), this, SLOT(removeFinished()));
+    connect(console, &TermWidgetHolder::finished, this, &TabWidget::removeFinished);
+    connect(console, &TermWidgetHolder::lastTerminalClosed, this, &TabWidget::removeFinished);
     connect(console, &TermWidgetHolder::termTitleChanged, this, &TabWidget::onTermTitleChanged);
     connect(this, &QTabWidget::currentChanged, this, &TabWidget::currentTitleChanged);
 
@@ -201,6 +202,15 @@ void TabWidget::renameCurrentSession()
     renameSession(currentIndex());
 }
 
+void TabWidget::setTitleColor(int index)
+{
+    QColor current = tabBar()->tabTextColor(index);
+    QColor color = QColorDialog::getColor(current, this, tr("Select new tab title color"));
+
+    if (color.isValid())
+        tabBar()->setTabTextColor(index, color);
+}
+
 void TabWidget::renameTabsAfterRemove()
 {
 // it breaks custom names - it replaces original/custom title with shell no #
@@ -218,23 +228,36 @@ void TabWidget::contextMenuEvent(QContextMenuEvent *event)
 
     QAction *close = menu.addAction(QIcon::fromTheme("document-close"), tr("Close session"));
     QAction *rename = menu.addAction(actions[RENAME_SESSION]->text());
+    QAction *changeColor = menu.addAction(QIcon::fromTheme("color-management"), tr("Change title color"));
     rename->setShortcut(actions[RENAME_SESSION]->shortcut());
     rename->blockSignals(true);
 
-    int tabIndex = tabBar()->tabAt(event->pos());
+    int tabIndex = tabBar()->tabAt(tabBar()->mapFrom(this,event->pos()));
     QAction *action = menu.exec(event->globalPos());
     if (action == close) {
         emit tabCloseRequested(tabIndex);
     } else if (action == rename) {
         emit tabRenameRequested(tabIndex);
+    } else if (action == changeColor) {
+	emit tabTitleColorChangeRequested(tabIndex);
     }
 }
 
 bool TabWidget::eventFilter(QObject *obj, QEvent *event)
 {
-    if (event->type() == QEvent::MouseButtonDblClick)
+    QMouseEvent *e = reinterpret_cast<QMouseEvent*>(event);
+    if (e->button() == Qt::MidButton) {
+        if (event->type() == QEvent::MouseButtonRelease) {
+            // close the tab on middle clicking
+            int index = tabBar()->tabAt(e->pos());
+            if (index > -1){
+                removeTab(index);
+                return true;
+            }
+        }
+    }
+    else if (event->type() == QEvent::MouseButtonDblClick)
     {
-        QMouseEvent *e = reinterpret_cast<QMouseEvent*>(event);
         // if user doubleclicks on tab button - rename it. If user
         // clicks on free space - open new tab
         int index = tabBar()->tabAt(e->pos());
@@ -282,7 +305,7 @@ void TabWidget::removeTab(int index)
     //    tabNumerator--;
         setUpdatesEnabled(true);
     } else {
-        emit closeTabNotification();
+        emit closeTabNotification(true);
     }
 
     renameTabsAfterRemove();
@@ -300,7 +323,7 @@ void TabWidget::removeCurrentTab()
     if (count() > 1) {
         removeTab(currentIndex());
     } else {
-        emit closeTabNotification();
+        emit closeTabNotification(false);
     }
 }
 
@@ -420,6 +443,8 @@ void TabWidget::propertiesChanged()
         console->propertiesChanged();
     }
     showHideTabBar();
+
+    setTabsClosable(Properties::Instance()->showCloseTabButton);
 
     // Update the tab widths
     mTabBar->setLimitWidth(Properties::Instance()->limitTabWidth);

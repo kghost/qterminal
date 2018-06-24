@@ -58,6 +58,7 @@ public slots:
     void moveRight();
     void renameSession(int);
     void renameCurrentSession();
+    void setTitleColor(int);
 
     void switchLeftSubterminal();
     void switchRightSubterminal();
@@ -90,8 +91,9 @@ public slots:
     void preset4Terminals();
 
 signals:
-    void closeTabNotification();
+    void closeTabNotification(bool);
     void tabRenameRequested(int);
+    void tabTitleColorChangeRequested(int);
     void currentTitleChanged(int);
 
 protected:

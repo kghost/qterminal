@@ -21,6 +21,7 @@
 #include <QDebug>
 #include <QStyleFactory>
 #include <QFileDialog>
+#include <QKeySequenceEdit>
 
 #include "propertiesdialog.h"
 #include "properties.h"
@@ -28,21 +29,47 @@
 #include "config.h"
 #include "qterminalapp.h"
 
+Delegate::Delegate (QObject *parent)
+    : QStyledItemDelegate (parent)
+{
+}
+
+QWidget* Delegate::createEditor(QWidget *parent,
+                                const QStyleOptionViewItem& /*option*/,
+                                const QModelIndex& /*index*/) const
+{
+    return new QKeySequenceEdit (parent);
+}
+
+bool Delegate::eventFilter(QObject *object, QEvent *event)
+{
+    QWidget *editor = qobject_cast<QWidget*>(object);
+    if (editor && event->type() == QEvent::KeyPress) {
+        int k = static_cast<QKeyEvent *>(event)->key();
+        if (k == Qt::Key_Return || k == Qt::Key_Enter) {
+            emit QAbstractItemDelegate::commitData(editor);
+            emit QAbstractItemDelegate::closeEditor(editor);
+            return true;
+        }
+    }
+    return QStyledItemDelegate::eventFilter (object, event);
+}
 
 PropertiesDialog::PropertiesDialog(QWidget *parent)
     : QDialog(parent)
 {
     setupUi(this);
 
-    connect(buttonBox->button(QDialogButtonBox::Apply), SIGNAL(clicked()),
-            this, SLOT(apply()));
-    connect(changeFontButton, SIGNAL(clicked()),
-            this, SLOT(changeFontButton_clicked()));
+    connect(buttonBox->button(QDialogButtonBox::Apply), &QPushButton::clicked,
+            this, &PropertiesDialog::apply);
+    connect(changeFontButton, &QPushButton::clicked,
+            this, &PropertiesDialog::changeFontButton_clicked);
     connect(chooseBackgroundImageButton, &QPushButton::clicked,
             this, &PropertiesDialog::chooseBackgroundImageButton_clicked);
 
     QStringList emulations = QTermWidget::availableKeyBindings();
     QStringList colorSchemes = QTermWidget::availableColorSchemes();
+    colorSchemes.sort(Qt::CaseInsensitive);
 
     listWidget->setCurrentRow(0);
     listWidget->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContentsOnFirstShow);
@@ -58,7 +85,10 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
     int eix = emulationComboBox->findText(Properties::Instance()->emulation);
     emulationComboBox->setCurrentIndex(eix != -1 ? eix : 0 );
 
-    /* shortcuts */
+    /* set the delegate of shortcut widget as well as its contents */
+    Delegate *del = new Delegate(shortcutsWidget);
+    shortcutsWidget->setItemDelegate(del);
+    shortcutsWidget->sortByColumn(0, Qt::AscendingOrder);
     setupShortcuts();
 
     /* scrollbar position */
@@ -76,6 +106,7 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
     /* tab width */
     limitTabWidthCheckBox->setChecked(Properties::Instance()->limitTabWidth);
     limitTabWidthSpinBox->setValue(Properties::Instance()->limitTabWidthValue);
+    closeTabButtonCheckBox->setChecked(Properties::Instance()->showCloseTabButton);
 
     /* keyboard cursor shape */
     QStringList keyboardCursorShapeList;
@@ -111,12 +142,16 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
 
     highlightCurrentCheckBox->setChecked(Properties::Instance()->highlightCurrentTerminal);
 
+    showTerminalSizeHintCheckBox->setChecked(Properties::Instance()->showTerminalSizeHint);
+
     askOnExitCheckBox->setChecked(Properties::Instance()->askOnExit);
 
     savePosOnExitCheckBox->setChecked(Properties::Instance()->savePosOnExit);
     saveSizeOnExitCheckBox->setChecked(Properties::Instance()->saveSizeOnExit);
 
     useCwdCheckBox->setChecked(Properties::Instance()->useCWD);
+
+    termComboBox->setCurrentText(Properties::Instance()->term);
 
     historyLimited->setChecked(Properties::Instance()->historyLimited);
     historyUnlimited->setChecked(!Properties::Instance()->historyLimited);
@@ -134,8 +169,8 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
     useBookmarksCheckBox->setChecked(Properties::Instance()->useBookmarks);
     bookmarksLineEdit->setText(Properties::Instance()->bookmarksFile);
     openBookmarksFile(Properties::Instance()->bookmarksFile);
-    connect(bookmarksButton, SIGNAL(clicked()),
-            this, SLOT(bookmarksButton_clicked()));
+    connect(bookmarksButton, &QPushButton::clicked,
+            this, &PropertiesDialog::bookmarksButton_clicked);
 
     terminalPresetComboBox->setCurrentIndex(Properties::Instance()->terminalsPreset);
 
@@ -145,7 +180,6 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
 
     trimPastedTrailingNewlinesCheckBox->setChecked(Properties::Instance()->trimPastedTrailingNewlines);
     confirmMultilinePasteCheckBox->setChecked(Properties::Instance()->confirmMultilinePaste);
-
 }
 
 
@@ -176,6 +210,7 @@ void PropertiesDialog::apply()
 
     Properties::Instance()->termTransparency = termTransparencyBox->value();
     Properties::Instance()->highlightCurrentTerminal = highlightCurrentCheckBox->isChecked();
+    Properties::Instance()->showTerminalSizeHint = showTerminalSizeHintCheckBox->isChecked();
     Properties::Instance()->backgroundImage = backgroundImageLineEdit->text();
 
     Properties::Instance()->askOnExit = askOnExitCheckBox->isChecked();
@@ -185,11 +220,14 @@ void PropertiesDialog::apply()
 
     Properties::Instance()->useCWD = useCwdCheckBox->isChecked();
 
+    Properties::Instance()->term = termComboBox->currentText();
+
     Properties::Instance()->scrollBarPos = scrollBarPos_comboBox->currentIndex();
     Properties::Instance()->tabsPos = tabsPos_comboBox->currentIndex();
     Properties::Instance()->limitTabWidth = limitTabWidthCheckBox->isChecked();
     Properties::Instance()->limitTabWidthValue = limitTabWidthSpinBox->value();
     Properties::Instance()->keyboardCursorShape = keybCursorShape_comboBox->currentIndex();
+    Properties::Instance()->showCloseTabButton = closeTabButtonCheckBox->isChecked();
     Properties::Instance()->hideTabBarWithOneTab = hideTabBarCheckBox->isChecked();
     Properties::Instance()->menuVisible = showMenuCheckBox->isChecked();
     Properties::Instance()->m_motionAfterPaste = motionAfterPasting_comboBox->currentIndex();
@@ -266,7 +304,8 @@ void PropertiesDialog::saveShortcuts()
         QString sequenceString = sequence.toString();
 
         QList<QKeySequence> shortcuts;
-        foreach (sequenceString, item->text().split('|'))
+        const auto sequences = item->text().split('|');
+        for (const QKeySequence& sequenceString : sequences)
             shortcuts.append(QKeySequence(sequenceString));
         keyAction->setShortcuts(shortcuts);
     }
@@ -287,41 +326,22 @@ void PropertiesDialog::setupShortcuts()
         QAction *keyAction = actions[keyValue];
         QStringList sequenceStrings;
 
-        foreach (const QKeySequence &shortcut, keyAction->shortcuts())
+        const auto shortcuts = keyAction->shortcuts();
+        for (const QKeySequence &shortcut : shortcuts)
             sequenceStrings.append(shortcut.toString());
 
         QTableWidgetItem *itemName = new QTableWidgetItem( tr(keyValue.toStdString().c_str()) );
         QTableWidgetItem *itemShortcut = new QTableWidgetItem( sequenceStrings.join('|') );
 
-        itemName->setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled );
+        itemName->setFlags( itemName->flags() & ~Qt::ItemIsEditable & ~Qt::ItemIsSelectable );
 
         shortcutsWidget->setItem(x, 0, itemName);
         shortcutsWidget->setItem(x, 1, itemShortcut);
     }
 
     shortcutsWidget->resizeColumnsToContents();
-/*
-    connect(shortcutsWidget, SIGNAL(currentChanged(int, int)),
-            this, SLOT(recordAction(int, int)));
-    connect(shortcutsWidget, SIGNAL(valueChanged(int, int)),
-            this, SLOT(validateAction(int, int)));
-*/
-}
 
-void PropertiesDialog::recordAction(int row, int column)
-{
-    oldAccelText = shortcutsWidget->item(row, column)->text();
-}
-
-void PropertiesDialog::validateAction(int row, int column)
-{
-    QTableWidgetItem *item = shortcutsWidget->item(row, column);
-    QString accelText = QKeySequence(item->text()).toString();
-
-    if (accelText.isEmpty() && !item->text().isEmpty())
-        item->setText(oldAccelText);
-    else
-        item->setText(accelText);
+    // No shortcut validation is needed with QKeySequenceEdit.
 }
 
 void PropertiesDialog::bookmarksButton_clicked()

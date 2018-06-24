@@ -123,7 +123,7 @@ public:
         QDir d;
 
         // standard $HOME subdirs
-        foreach (QStandardPaths::StandardLocation i, locations)
+        for (const QStandardPaths::StandardLocation i : qAsConst(locations))
         {
             path = QStandardPaths::writableLocation(i);
             if (!d.exists(path))
@@ -140,7 +140,8 @@ public:
 
         // system env - include dirs in the tree
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-        foreach (const QString &i, env.keys())
+        const auto keys = env.keys();
+        for (const QString &i : keys)
         {
             path = env.value(i);
             if (!d.exists(path) || !QFileInfo(path).isDir())
@@ -369,8 +370,8 @@ BookmarksWidget::BookmarksWidget(QWidget *parent)
     treeView->setModel(m_model);
     treeView->header()->hide();
 
-    connect(treeView, SIGNAL(doubleClicked(QModelIndex)),
-            this, SLOT(handleCommand(QModelIndex)));
+    connect(treeView, &QTreeView::doubleClicked,
+            this, &BookmarksWidget::handleCommand);
 }
 
 BookmarksWidget::~BookmarksWidget()
