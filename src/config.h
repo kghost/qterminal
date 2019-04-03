@@ -67,7 +67,7 @@
 
 #define DEFAULT_WIDTH                  800
 #define DEFAULT_HEIGHT                 600
-#define DEFAULT_FONT                   "Monospace"
+#define DEFAULT_FONT                   "Consolas"
 
 // ACTIONS
 #define CLEAR_TERMINAL_SHORTCUT        "Ctrl+Shift+X"
