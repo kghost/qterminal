@@ -21,7 +21,6 @@
 #include <QDebug>
 #include <QStyleFactory>
 #include <QFileDialog>
-#include <QKeySequenceEdit>
 
 #include "propertiesdialog.h"
 #include "properties.h"
@@ -38,17 +37,23 @@ QWidget* Delegate::createEditor(QWidget *parent,
                                 const QStyleOptionViewItem& /*option*/,
                                 const QModelIndex& /*index*/) const
 {
-    return new QKeySequenceEdit (parent);
+    return new KeySequenceEdit(parent);
 }
 
 bool Delegate::eventFilter(QObject *object, QEvent *event)
 {
-    QWidget *editor = qobject_cast<QWidget*>(object);
+    KeySequenceEdit *editor = qobject_cast<KeySequenceEdit*>(object);
     if (editor && event->type() == QEvent::KeyPress) {
-        int k = static_cast<QKeyEvent *>(event)->key();
+        QKeyEvent *ke = static_cast<QKeyEvent *>(event);
+        int k = ke->key();
         if (k == Qt::Key_Return || k == Qt::Key_Enter) {
             emit QAbstractItemDelegate::commitData(editor);
             emit QAbstractItemDelegate::closeEditor(editor);
+            return true;
+        }
+        // treat Tab and Backtab like other keys
+        else if(k == Qt::Key_Tab || k ==  Qt::Key_Backtab) {
+            editor->pressKey(ke);
             return true;
         }
     }
@@ -104,8 +109,8 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
     tabsPos_comboBox->setCurrentIndex(Properties::Instance()->tabsPos);
 
     /* tab width */
-    limitTabWidthCheckBox->setChecked(Properties::Instance()->limitTabWidth);
-    limitTabWidthSpinBox->setValue(Properties::Instance()->limitTabWidthValue);
+    fixedTabWidthCheckBox->setChecked(Properties::Instance()->fixedTabWidth);
+    fixedTabWidthSpinBox->setValue(Properties::Instance()->fixedTabWidthValue);
     closeTabButtonCheckBox->setChecked(Properties::Instance()->showCloseTabButton);
 
     /* keyboard cursor shape */
@@ -135,6 +140,8 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
         styleComboBox->setCurrentIndex(ix);
 
     setFontSample(Properties::Instance()->font);
+
+    terminalMarginSpinBox->setValue(Properties::Instance()->terminalMargin);
 
     appTransparencyBox->setValue(Properties::Instance()->appTransparency);
 
@@ -180,6 +187,8 @@ PropertiesDialog::PropertiesDialog(QWidget *parent)
 
     trimPastedTrailingNewlinesCheckBox->setChecked(Properties::Instance()->trimPastedTrailingNewlines);
     confirmMultilinePasteCheckBox->setChecked(Properties::Instance()->confirmMultilinePaste);
+
+    resize(sizeHint()); // show it compact but not too much
 }
 
 
@@ -208,6 +217,7 @@ void PropertiesDialog::apply()
                 :
             Properties::Instance()->appTransparency = appTransparencyBox->value();
 
+    Properties::Instance()->terminalMargin = terminalMarginSpinBox->value();
     Properties::Instance()->termTransparency = termTransparencyBox->value();
     Properties::Instance()->highlightCurrentTerminal = highlightCurrentCheckBox->isChecked();
     Properties::Instance()->showTerminalSizeHint = showTerminalSizeHintCheckBox->isChecked();
@@ -224,8 +234,8 @@ void PropertiesDialog::apply()
 
     Properties::Instance()->scrollBarPos = scrollBarPos_comboBox->currentIndex();
     Properties::Instance()->tabsPos = tabsPos_comboBox->currentIndex();
-    Properties::Instance()->limitTabWidth = limitTabWidthCheckBox->isChecked();
-    Properties::Instance()->limitTabWidthValue = limitTabWidthSpinBox->value();
+    Properties::Instance()->fixedTabWidth = fixedTabWidthCheckBox->isChecked();
+    Properties::Instance()->fixedTabWidthValue = fixedTabWidthSpinBox->value();
     Properties::Instance()->keyboardCursorShape = keybCursorShape_comboBox->currentIndex();
     Properties::Instance()->showCloseTabButton = closeTabButtonCheckBox->isChecked();
     Properties::Instance()->hideTabBarWithOneTab = hideTabBarCheckBox->isChecked();
@@ -263,7 +273,7 @@ void PropertiesDialog::apply()
 void PropertiesDialog::setFontSample(const QFont & f)
 {
     fontSampleLabel->setFont(f);
-    QString sample("%1 %2 pt");
+    QString sample = QString::fromLatin1("%1 %2 pt");
     fontSampleLabel->setText(sample.arg(f.family()).arg(f.pointSize()));
 }
 
@@ -304,7 +314,7 @@ void PropertiesDialog::saveShortcuts()
         QString sequenceString = sequence.toString();
 
         QList<QKeySequence> shortcuts;
-        const auto sequences = item->text().split('|');
+        const auto sequences = item->text().split(QLatin1Char('|'));
         for (const QKeySequence& sequenceString : sequences)
             shortcuts.append(QKeySequence(sequenceString));
         keyAction->setShortcuts(shortcuts);
@@ -331,7 +341,7 @@ void PropertiesDialog::setupShortcuts()
             sequenceStrings.append(shortcut.toString());
 
         QTableWidgetItem *itemName = new QTableWidgetItem( tr(keyValue.toStdString().c_str()) );
-        QTableWidgetItem *itemShortcut = new QTableWidgetItem( sequenceStrings.join('|') );
+        QTableWidgetItem *itemShortcut = new QTableWidgetItem( sequenceStrings.join(QLatin1Char('|')) );
 
         itemName->setFlags( itemName->flags() & ~Qt::ItemIsEditable & ~Qt::ItemIsSelectable );
 
@@ -365,9 +375,9 @@ void PropertiesDialog::openBookmarksFile(const QString &fname)
     QFile f(fname);
     QString content;
     if (!f.open(QFile::ReadOnly))
-        content = "<qterminal>\n  <group name=\"group1\">\n    <command name=\"cmd1\" value=\"cd $HOME\"/>\n  </group>\n</qterminal>";
+        content = QString::fromLatin1("<qterminal>\n  <group name=\"group1\">\n    <command name=\"cmd1\" value=\"cd $HOME\"/>\n  </group>\n</qterminal>");
     else
-        content = f.readAll();
+        content = QString::fromUtf8(f.readAll());
 
     bookmarkPlainEdit->setPlainText(content);
     bookmarkPlainEdit->document()->setModified(false);

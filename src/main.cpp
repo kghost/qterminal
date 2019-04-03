@@ -54,7 +54,7 @@ QTerminalApp * QTerminalApp::m_instance = NULL;
 
 void print_usage_and_exit(int code)
 {
-    printf("QTerminal %s\n", STR_VERSION);
+    printf("QTerminal %s\n", QTERMINAL_VERSION);
     puts("Usage: qterminal [OPTION]...\n");
     puts("  -h,  --help               Print this help");
     puts("  -p,  --profile            Load qterminal with specific options");
@@ -66,7 +66,7 @@ void print_usage_and_exit(int code)
 
 void print_version_and_exit(int code=0)
 {
-    printf("%s\n", STR_VERSION);
+    printf("%s\n", QTERMINAL_VERSION);
     exit(code);
 }
 
@@ -79,13 +79,16 @@ void parse_args(int argc, char* argv[])
         {
             case 'h':
                 print_usage_and_exit(0);
+                break;
             case 'p':
-                Properties::Instance(QString(optarg));
+                Properties::Instance(QString::fromLocal8Bit(optarg));
                 break;
             case '?':
                 print_usage_and_exit(1);
+                break;
             case 'v':
                 print_version_and_exit();
+                break;
         }
     }
     while(next_option != -1);
@@ -93,12 +96,9 @@ void parse_args(int argc, char* argv[])
 
 int main(int argc, char *argv[])
 {
-#ifdef HAVE_F_SETENV
-	setenv("TERM", "xterm", 1); // TODO/FIXME: why?
-#endif // HAVE_F_SETENV
-    QApplication::setApplicationName("qterminal");
-    QApplication::setApplicationVersion(STR_VERSION);
-    QApplication::setOrganizationDomain("qterminal.org");
+    QApplication::setApplicationName(QStringLiteral("qterminal"));
+    QApplication::setApplicationVersion(QStringLiteral(QTERMINAL_VERSION));
+    QApplication::setOrganizationDomain(QStringLiteral("qterminal.org"));
 #if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
     QApplication::setDesktopFileName(QLatin1String("qterminal.desktop"));
 #endif
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     const QSettings settings;
     const QFileInfo customStyle = QFileInfo(
         QFileInfo(settings.fileName()).canonicalPath() +
-        "/style.qss"
+        QStringLiteral("/style.qss")
     );
     if (customStyle.isFile() && customStyle.isReadable())
     {
@@ -129,14 +129,14 @@ int main(int argc, char *argv[])
     /* setup our custom icon theme if there is no system theme (OS X, Windows) */
     QCoreApplication::instance()->setAttribute(Qt::AA_UseHighDpiPixmaps); //Fix for High-DPI systems
     if (QIcon::themeName().isEmpty())
-        QIcon::setThemeName("QTerminal");
+        QIcon::setThemeName(QStringLiteral("QTerminal"));
 
     // translations
-    QString fname = QString("qterminal_%1.qm").arg(QLocale::system().name().left(5));
+    QString fname = QString::fromLatin1("qterminal_%1.qm").arg(QLocale::system().name().left(5));
     QTranslator translator;
 #ifdef TRANSLATIONS_DIR
     qDebug() << "TRANSLATIONS_DIR: Loading translation file" << fname << "from dir" << TRANSLATIONS_DIR;
-    qDebug() << "load success:" << translator.load(fname, TRANSLATIONS_DIR, "_");
+    qDebug() << "load success:" << translator.load(fname, QString::fromUtf8(TRANSLATIONS_DIR), QStringLiteral("_"));
 #endif
 #ifdef APPLE_BUNDLE
     qDebug() << "APPLE_BUNDLE: Loading translator file" << fname << "from dir" << QApplication::applicationDirPath()+"../translations";
@@ -154,6 +154,8 @@ int main(int argc, char *argv[])
 MainWindow *QTerminalApp::newWindow(TerminalConfig &cfg)
 {
     MainWindow *window = new MainWindow(cfg, false);
+    if (Properties::Instance()->windowMaximized)
+        window->setWindowState(Qt::WindowMaximized);
     window->show();
     return window;
 }
@@ -182,7 +184,7 @@ QTerminalApp::QTerminalApp(int &argc, char **argv)
     connect(bridge, SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(bridgeErrorOccurred(QProcess::ProcessError)));  // connect process signals with your code
     connect(bridge, SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(bridgeFinished(int, QProcess::ExitStatus)));  // connect process signals with your code
     connect(bridge, SIGNAL(readyReadStandardOutput()), this, SLOT(bridgeOutput()));  // connect process signals with your code
-    bridge->start("WSL.exe", {"./tcppty"});
+    bridge->start(QString::fromUtf8("WSL.exe"), {QString::fromUtf8("./tcppty")});
 }
 
 QTerminalApp::~QTerminalApp() {
@@ -196,7 +198,7 @@ void QTerminalApp::bridgeErrorOccurred(QProcess::ProcessError error) {
 	QString msg;
 	msg.sprintf("Bridge failed (%d), Check your WSL installation.\n\n", error);
 	msgBox.setIcon(QMessageBox::Critical);
-	msgBox.setText(msg + bridge->readAllStandardError());
+	msgBox.setText(msg + QString::fromUtf8(bridge->readAllStandardError()));
 	msgBox.exec();
 }
 
@@ -205,7 +207,7 @@ void QTerminalApp::bridgeFinished(int exitCode, QProcess::ExitStatus exitStatus)
 	QString msg;
 	msg.sprintf("Bridge exited (%d/%d), Check your WSL installation.\n\n", exitCode, exitStatus);
 	msgBox.setIcon(QMessageBox::Critical);
-	msgBox.setText(msg + bridge->readAllStandardError());
+	msgBox.setText(msg + QString::fromUtf8(bridge->readAllStandardError()));
 	msgBox.exec();
 }
 
@@ -265,7 +267,7 @@ void QTerminalApp::registerOnDbus()
         return;
     }
     new ProcessAdaptor(this);
-    QDBusConnection::sessionBus().registerObject("/", this);
+    QDBusConnection::sessionBus().registerObject(QStringLiteral("/"), this);
 }
 
 QList<QDBusObjectPath> QTerminalApp::getWindows()

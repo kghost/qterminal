@@ -29,13 +29,13 @@
 #include "config.h"
 #include "properties.h"
 #include "qterminalapp.h"
+#include "tab-switcher.h"
 
 
 #define TAB_INDEX_PROPERTY "tab_index"
 #define TAB_CUSTOM_NAME_PROPERTY "custom_name"
 
-
-TabWidget::TabWidget(QWidget* parent) : QTabWidget(parent), tabNumerator(0), mTabBar(new TabBar(this))
+TabWidget::TabWidget(QWidget* parent) : QTabWidget(parent), tabNumerator(0), mTabBar(new TabBar(this)), mSwitcher(new TabSwitcher(this))
 {
     // Insert our own tab bar which overrides tab width and eliding
     setTabBar(mTabBar);
@@ -59,7 +59,12 @@ TabWidget::TabWidget(QWidget* parent) : QTabWidget(parent), tabNumerator(0), mTa
     connect(tabBar(), &QTabBar::tabMoved, this, &TabWidget::updateTabIndices);
     connect(this, &TabWidget::tabRenameRequested, this, &TabWidget::renameSession);
     connect(this, &TabWidget::tabTitleColorChangeRequested, this, &TabWidget::setTitleColor);
+    connect(mSwitcher.data(), &TabSwitcher::activateTab, this, &TabWidget::switchTab);
+    connect(this, &TabWidget::currentChanged, this, &TabWidget::saveCurrentChanged);
 }
+
+TabWidget::~TabWidget()
+{}
 
 TermWidgetHolder * TabWidget::terminalHolder()
 {
@@ -226,10 +231,10 @@ void TabWidget::contextMenuEvent(QContextMenuEvent *event)
     QMenu menu(this);
     QMap< QString, QAction * > actions = findParent<MainWindow>(this)->leaseActions();
 
-    QAction *close = menu.addAction(QIcon::fromTheme("document-close"), tr("Close session"));
-    QAction *rename = menu.addAction(actions[RENAME_SESSION]->text());
-    QAction *changeColor = menu.addAction(QIcon::fromTheme("color-management"), tr("Change title color"));
-    rename->setShortcut(actions[RENAME_SESSION]->shortcut());
+    QAction *close = menu.addAction(QIcon::fromTheme(QStringLiteral("document-close")), tr("Close session"));
+    QAction *rename = menu.addAction(actions[QLatin1String(RENAME_SESSION)]->text());
+    QAction *changeColor = menu.addAction(QIcon::fromTheme(QStringLiteral("color-management")), tr("Change title color"));
+    rename->setShortcut(actions[QLatin1String(RENAME_SESSION)]->shortcut());
     rename->blockSignals(true);
 
     int tabIndex = tabBar()->tabAt(tabBar()->mapFrom(this,event->pos()));
@@ -292,6 +297,7 @@ void TabWidget::removeTab(int index)
         setUpdatesEnabled(false);
 
         QWidget * w = widget(index);
+        mHistory.removeAll(w);
         QTabWidget::removeTab(index);
         w->deleteLater();
 
@@ -310,6 +316,23 @@ void TabWidget::removeTab(int index)
 
     renameTabsAfterRemove();
     showHideTabBar();
+}
+
+void TabWidget::switchTab(int index)
+{
+    setCurrentIndex(index);
+}
+
+void TabWidget::saveCurrentChanged(int index)
+{
+    auto* w = widget(index);
+    mHistory.removeAll(w);
+    mHistory.prepend(w);
+}
+
+const QList<QWidget*>& TabWidget::history() const
+{
+    return mHistory;
 }
 
 void TabWidget::removeCurrentTab()
@@ -347,6 +370,16 @@ int TabWidget::switchToLeft()
         setCurrentIndex(previous_pos);
     findParent<MainWindow>(this)->updateDisabledActions();
     return currentIndex();
+}
+
+void TabWidget::switchToNext()
+{
+    mSwitcher->selectItem(false);
+}
+
+void TabWidget::switchToPrev()
+{
+    mSwitcher->selectItem(true);
 }
 
 
@@ -447,8 +480,8 @@ void TabWidget::propertiesChanged()
     setTabsClosable(Properties::Instance()->showCloseTabButton);
 
     // Update the tab widths
-    mTabBar->setLimitWidth(Properties::Instance()->limitTabWidth);
-    mTabBar->setLimitWidthValue(Properties::Instance()->limitTabWidthValue);
+    mTabBar->setFixedWidth(Properties::Instance()->fixedTabWidth);
+    mTabBar->setFixedWidthValue(Properties::Instance()->fixedTabWidthValue);
     mTabBar->updateWidth();
 }
 

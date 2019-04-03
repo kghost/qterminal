@@ -59,6 +59,7 @@ class Properties
 
         Sessions sessions;
 
+        int terminalMargin;
         int appTransparency;
         int termTransparency;
         QString backgroundImage;
@@ -69,8 +70,8 @@ class Properties
         bool hideTabBarWithOneTab;
         int m_motionAfterPaste;
 
-        bool limitTabWidth;
-        int limitTabWidthValue;
+        bool fixedTabWidth;
+        int fixedTabWidthValue;
 
         bool showCloseTabButton;
 
@@ -105,6 +106,8 @@ class Properties
 
         bool confirmMultilinePaste;
         bool trimPastedTrailingNewlines;
+
+        bool windowMaximized;
 
 
     private:
